@@ -1,0 +1,34 @@
+{
+  "dashboard": {
+    "title": "E-Commerce Microservices Dashboard",
+    "panels": [
+      {
+        "title": "Services Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"api-gateway|auth-service|product-service|order-service|payment-service|notification-service\"}"
+          }
+        ]
+      },
+      {
+        "title": "API Gateway Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"api-gateway\"}[5m])"
+          }
+        ]
+      },
+      {
+        "title": "Service Response Times",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])"
+          }
+        ]
+      }
+    ]
+  }
+}

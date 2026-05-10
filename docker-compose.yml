@@ -1,0 +1,310 @@
+services:
+  # API Gateway
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: api-gateway
+    ports:
+      - "${API_GATEWAY_PORT}:8080"
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - PRODUCT_SERVICE_URL=http://product-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3005
+    depends_on:
+      - auth-service
+      - product-service
+      - order-service
+      - payment-service
+      - notification-service
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Auth Service
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT}:3001"
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - PORT=3001
+      - DB_HOST=postgres-auth
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_AUTH_DB}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRY=${JWT_EXPIRY}
+      - JWT_REFRESH_EXPIRY=${JWT_REFRESH_EXPIRY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Product Service
+  product-service:
+    build: ./services/product-service
+    container_name: product-service
+    ports:
+      - "${PRODUCT_SERVICE_PORT}:3002"
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - PORT=3002
+      - MONGODB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_INITDB_DATABASE}?authSource=admin
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Order Service (Go)
+  order-service:
+    build: ./services/order-service
+    container_name: order-service
+    ports:
+      - "${ORDER_SERVICE_PORT}:3003"
+    environment:
+      - DB_HOST=postgres-orders
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_ORDERS_DB}
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+    depends_on:
+      postgres-orders:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Payment Service (Python)
+  payment-service:
+    build: ./services/payment-service
+    container_name: payment-service
+    ports:
+      - "${PAYMENT_SERVICE_PORT}:3004"
+    environment:
+      - DB_HOST=postgres-payments
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_PAYMENTS_DB}
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      postgres-payments:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build: ./services/notification-service
+    container_name: notification-service
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT}:3005"
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - PORT=3005
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # PostgreSQL - Auth Service
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: postgres-auth
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_AUTH_DB}
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./services/auth-service/src/config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_AUTH_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # PostgreSQL - Orders Service
+  postgres-orders:
+    image: postgres:15-alpine
+    container_name: postgres-orders
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_ORDERS_DB}
+    volumes:
+      - postgres-orders-data:/var/lib/postgresql/data
+      - ./services/order-service/config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_ORDERS_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # PostgreSQL - Payments Service
+  postgres-payments:
+    image: postgres:15-alpine
+    container_name: postgres-payments
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_PAYMENTS_DB}
+    volumes:
+      - postgres-payments-data:/var/lib/postgresql/data
+      - ./services/payment-service/models/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_PAYMENTS_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # MongoDB
+  mongodb:
+    image: mongo:6
+    container_name: mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+    volumes:
+      - mongodb-data:/data/db
+      - ./services/product-service/src/config/init.js:/docker-entrypoint-initdb.d/init.js
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    networks:
+      - ecommerce-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+networks:
+  ecommerce-network:
+    driver: bridge
+    name: ecommerce-network
+
+volumes:
+  postgres-auth-data:
+  postgres-orders-data:
+  postgres-payments-data:
+  mongodb-data:
+  redis-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:

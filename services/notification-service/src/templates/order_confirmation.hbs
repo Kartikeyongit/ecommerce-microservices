@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #4CAF50; color: white; padding: 20px; text-align: center; }
+    .order-details { background: #f9f9f9; padding: 20px; margin: 20px 0; }
+    .item { border-bottom: 1px solid #ddd; padding: 10px 0; }
+    .total { font-size: 1.2em; font-weight: bold; margin-top: 20px; }
+    .footer { text-align: center; color: #666; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Order Confirmed!</h1>
+      <p>Order #{{orderId}}</p>
+    </div>
+    
+    <p>Dear {{customerName}},</p>
+    <p>Thank you for your order! We're excited to let you know that your order has been confirmed.</p>
+    
+    <div class="order-details">
+      <h2>Order Details</h2>
+      <p><strong>Order Number:</strong> #{{orderId}}</p>
+      <p><strong>Order Date:</strong> {{orderDate}}</p>
+      <p><strong>Estimated Delivery:</strong> {{estimatedDelivery}}</p>
+      
+      <h3>Items Ordered</h3>
+      {{#each items}}
+      <div class="item">
+        <p><strong>{{name}}</strong></p>
+        <p>Quantity: {{quantity}} × ${{price}} = ${{total}}</p>
+      </div>
+      {{/each}}
+      
+      <div class="total">
+        <p>Subtotal: ${{subtotal}}</p>
+        <p>Shipping: ${{shipping}}</p>
+        <p>Tax: ${{tax}}</p>
+        <p><strong>Total: ${{total}}</strong></p>
+      </div>
+    </div>
+    
+    <h3>Shipping Address</h3>
+    <p>
+      {{shippingAddress.street}}<br>
+      {{shippingAddress.city}}, {{shippingAddress.state}} {{shippingAddress.zip}}<br>
+      {{shippingAddress.country}}
+    </p>
+    
+    <p>You can track your order status by <a href="{{trackingUrl}}">clicking here</a>.</p>
+    
+    <div class="footer">
+      <p>If you have any questions, please contact our support team.</p>
+      <p>© {{year}} E-Commerce Store. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
