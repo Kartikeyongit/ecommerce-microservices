@@ -201,6 +201,14 @@ npm run test:e2e
 
 ---
 
+## 📷 Screenshots
+
+<img width="1321" height="870" alt="Screenshot 2026-05-10 143503" src="https://github.com/user-attachments/assets/3cf3d8c9-512c-47d8-8e58-65f16b43bf0b" />
+<img width="1299" height="770" alt="Screenshot 2026-05-10 143556" src="https://github.com/user-attachments/assets/8bfb59cc-c52a-42d4-8dfb-baf4ecf04605" />
+<img width="1305" height="484" alt="Screenshot 2026-05-10 143610" src="https://github.com/user-attachments/assets/1dad49fd-f044-4222-b397-497437883fdd" />
+
+---
+
 ## 📈 Performance
 
 - Redis caching for product queries
